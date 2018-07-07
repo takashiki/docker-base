@@ -15,7 +15,7 @@ ENV TERM=xterm
 RUN apt-get install -y software-properties-common && \
     add-apt-repository -y ppa:ondrej/php
 
-RUN apt-get update && \
+RUN apt-get update -yqq && \
     apt-get install -y --allow-downgrades --allow-remove-essential \
         --allow-change-held-packages \
         php7.2-cli \
@@ -46,13 +46,38 @@ RUN apt-get update && \
         curl \
         vim \
         nano \
-        postgresql-client \
-    && apt-get clean
+        zsh \
+        postgresql-client && \
+    pecl channel-update pecl.php.net
+
+RUN apt-get -y install libxml2-dev php7.2-soap \
+    libldap2-dev php7.2-ldap \
+    php7.2-imap
+
+RUN pecl install -o -f redis && \
+    echo "extension=redis.so" >> /etc/php/7.2/mods-available/redis.ini && \
+    phpenmod redis
+    
+RUN pecl install swoole && \
+    echo "extension=swoole.so" >> /etc/php/7.2/mods-available/swoole.ini && \
+    ln -s /etc/php/7.2/mods-available/swoole.ini /etc/php/7.2/cli/conf.d/20-swoole.ini
+
+USER root
 
 # composer
 RUN curl -s http://getcomposer.org/installer | php && \
-    echo "export PATH=${PATH}:/var/www/vendor/bin" >> ~/.bashrc && \
-    mv composer.phar /usr/local/bin/composer
+    mv composer.phar /usr/local/bin/composer && \
+    composer global require "hirak/prestissimo" && \
+    echo 'export PATH="~/.composer/vendor/bin:$PATH"' >> ~/.bashrc && \
+    . ~/.bashrc
 
-# Source the bash
-RUN . ~/.bashrc
+RUN apt-get install -y software-properties-common gnupg && \
+    curl -sL https://deb.nodesource.com/setup_10.x | bash - && \
+    apt-get install -y nodejs && \
+    npm i -g nrm n npm gulp webpack cross-env && \
+    n latest
+
+# clean up
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    rm /var/log/lastlog /var/log/faillog
